@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=41", "wheel", "setuptools-git-versioning<2"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ask-bedrock"
-version = "0.0.3"
+dynamic = ["version"]
 description = 'Converse with your favorite Amazon Bedrock LLM from the command line.'
 readme = "README.md"
 authors = [
@@ -26,3 +26,7 @@ requires-python = ">=3.9"
 
 [project.scripts]
 ask-bedrock = "ask_bedrock.main:cli"
+
+[tool.setuptools-git-versioning]
+enabled = true
+dev_template = "{tag}.post{ccount}"
