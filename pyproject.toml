@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ask-bedrock"
+version = "0.0.3"
+description = 'Converse with your favorite Amazon Bedrock LLM from the command line.'
+readme = "README.md"
+authors = [
+    {name='Ulrich Hinze', email = 'uhinze@amazon.de'},
+    {name='Alexander Günsche', email = 'lxg@amazon.de'},
+]
+keywords = ["ask-bedrock","GenAI","Bedrock","AWS"]
+classifiers=[
+"Development Status :: 4 - Beta",
+"Topic :: Utilities",
+]
+dependencies = [
+    "click",
+    "pyyaml",
+    "boto3>=1.28.57",
+    "langchain>=0.0.309",
+    ]
+requires-python = ">=3.9"
+
+[project.scripts]
+ask-bedrock = "ask_bedrock.main:cli"

@@ -1,0 +1,5 @@
+dist
+ask_bedrock.egg-info
+.DS_Store
+bedrock.env
+.vscode
