@@ -148,7 +148,7 @@ def create_config(existing_config: str) -> dict:
     except Exception as e:
         if isinstance(e, ValueError) and "AccessDeniedException" in str(e):
             click.secho(
-                f"{e}\nAccess denied while trying out the model. Have you enabled model access? Go to the Amazon Bedrock console and select 'Model access' to make sure.",
+                f"{e}\nAccess denied while trying out the model. Have you enabled model access? Go to the Amazon Bedrock console and select 'Model access' to make sure. Alternatively, choose a different model.",
                 fg="red",
             )
             return None
