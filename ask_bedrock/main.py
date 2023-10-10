@@ -1,3 +1,4 @@
+import atexit
 import json
 import os
 from collections.abc import Callable
@@ -11,6 +12,12 @@ from langchain.memory import ConversationBufferMemory
 
 config_file_path = os.path.join(
     os.path.expanduser("~"), ".config", "ask-bedrock", "config.yaml"
+)
+
+atexit.register(
+    lambda: click.echo(
+        "Thank you for using Ask Amazon Bedrock! Consider sharing your feedback here: https://pulse.aws/survey/GTRWNHT1"
+    )
 )
 
 
@@ -38,7 +45,8 @@ def converse(context: str):
 def configure(context: str):
     existing_config = get_config(context)
     config = create_config(existing_config)
-    put_config(context, config)
+    if config is not None:
+        put_config(context, config)
 
 
 def start_conversation(config: dict):
@@ -96,12 +104,19 @@ def create_config(existing_config: str) -> dict:
     )
 
     bedrock = boto3.Session(profile_name=aws_profile).client("bedrock", region)
-    available_models = click.Choice(
-        [
-            model["modelId"]
-            for model in bedrock.list_foundation_models()["modelSummaries"]
-        ]
-    )
+    all_models = bedrock.list_foundation_models()["modelSummaries"]
+
+    if (custom_models := bedrock.list_custom_models()["modelSummaries"]) is not None:
+        all_models.extend(custom_models)
+
+    applicable_models = [
+        model
+        for model in all_models
+        if model["outputModalities"] == ["TEXT"]
+        and model["inputModalities"] == ["TEXT"]
+    ]
+
+    available_models = click.Choice([model["modelId"] for model in applicable_models])
     model_id = click.prompt(
         "🚗 Model",
         type=available_models,
@@ -131,8 +146,18 @@ def create_config(existing_config: str) -> dict:
             fg="yellow",
         )
     except Exception as e:
-        click.echo(f"Something went wrong while trying out the model, not saving this.")
-        raise e
+        if isinstance(e, ValueError) and "AccessDeniedException" in str(e):
+            click.secho(
+                f"{e}\nAccess denied while trying out the model. Have you enabled model access? Go to the Amazon Bedrock console and select 'Model access' to make sure.",
+                fg="red",
+            )
+            return None
+        else:
+            click.secho(
+                f"{e}\nSomething went wrong while trying out the model, not saving this.",
+                fg="red",
+            )
+            return None
 
     return config
 
