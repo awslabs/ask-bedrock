@@ -6,7 +6,7 @@ Converse with your favorite [Amazon Bedrock](https://aws.amazon.com/bedrock/) la
   <img width="1000" src="README.svg">
 </p>
 
-This tool is a wrapper around the low-level Bedrock APIs. Its main added value is that it locally persists AWS account and model configuration to enable quick and easy access.
+This tool is a wrapper around the low-level Amazon Bedrock APIs and [Langchain](https://python.langchain.com/docs/integrations/llms/bedrock). Its main added value is that it locally persists AWS account and model configuration to enable quick and easy interaction.
 
 ## Installation
 
@@ -82,7 +82,8 @@ As this tool is still early stage, we are very interested in hearing about your 
 ## Troubleshooting
 
 **Q:** I’m getting the following error during invocation: “ValueError: Error raised by bedrock service: An error occurred (AccessDeniedException) when calling the InvokeModel operation: Your account is not authorized to invoke this API operation.”
-**A:** You may have selected a model that is currently not yet activated for public usage. It may have been listed it in the selection of available models, but unfortunately some models (such as the Titan) aren’t yet available via API.
+
+**A:** You may have selected a model that is currently not yet activated for public usage. It may have been listed it in the selection of available models, but unfortunately some models (such as Amazon Titan) aren’t yet available via API.
 
 ## Security
 
