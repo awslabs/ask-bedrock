@@ -14,9 +14,12 @@ This tool is a wrapper around the low-level Bedrock APIs. Its main added value i
 
 ⚠️ Requires a working AWS CLI setup configured with a profile that allows Amazon Bedrock access. See [CLI documentation](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html) for details.
 
+
 ```shell
 pip install ask-bedrock
 ```
+
+You can also build/run this project locally, see [Building and Running Locally](#building-and-running-locally).
 
 ## Usage
 
@@ -67,11 +70,12 @@ This JSON is passed to Langchain during client setup (as `model_kwargs`). The sc
 
 If you want to configure multiple lines, model parameters can be wrapped in `<<< >>>`.
 
-## Building from source
+## Building and Running Locally
 
 ```
-pip install -r requirements.txt
+pip install build
 python -m build
+python ask_bedrock/main.py converse
 ```
 
 ## Feedback
