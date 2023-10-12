@@ -51,7 +51,11 @@ def configure(context: str):
 
 def start_conversation(config: dict):
     llm = model_from_config(config)
-    conversation = ConversationChain(llm=llm, memory=ConversationBufferMemory())
+
+    conversation = ConversationChain(
+        llm=llm,
+        memory=ConversationBufferMemory(ai_prefix="Assistant"),
+    )
 
     while True:
         prompt = multiline_prompt(
