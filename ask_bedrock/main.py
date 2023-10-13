@@ -16,7 +16,7 @@ config_file_path = os.path.join(
 
 atexit.register(
     lambda: click.echo(
-        "Thank you for using Ask Amazon Bedrock! Consider sharing your feedback here: https://pulse.aws/survey/GTRWNHT1"
+        "\nThank you for using Ask Amazon Bedrock! Consider sharing your feedback here: https://pulse.aws/survey/GTRWNHT1"
     )
 )
 
@@ -50,7 +50,11 @@ def configure(context: str):
 
 
 def start_conversation(config: dict):
-    llm = model_from_config(config)
+    try:
+        llm = model_from_config(config)
+    except Exception as e:
+        click.secho(f"Error while building Bedrock model:\n{e}", fg="red")
+        return
 
     conversation = ConversationChain(
         llm=llm,
