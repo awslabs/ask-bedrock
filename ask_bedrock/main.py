@@ -70,7 +70,8 @@ def start_conversation(config: dict):
 
         response = conversation.predict(input=prompt)
 
-        click.secho(response, fg="yellow")
+        if not llm.streaming:
+            click.secho(response, fg="yellow")
 
 
 def get_config(context: str) -> dict:
@@ -173,6 +174,10 @@ class YellowStreamingCallbackHandler(StreamingStdOutCallbackHandler):
     def on_llm_new_token(self, token: str, **kwargs) -> None:
         """Run on new LLM token. Only available when streaming is enabled."""
         sys.stdout.write(click.style(token, fg="yellow"))
+        sys.stdout.flush()
+
+    def on_llm_end(self, response, **kwargs) -> None:
+        sys.stdout.write("\n")
         sys.stdout.flush()
 
 
