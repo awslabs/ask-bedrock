@@ -3,7 +3,7 @@
 Converse with your favorite [Amazon Bedrock](https://aws.amazon.com/bedrock/) large language model from the command line.
 
 <p>
-  <img width="1000" src="README.svg">
+  <img width="1000" src="https://raw.githubusercontent.com/awslabs/ask-bedrock/main/README.svg">
 </p>
 
 This tool is a wrapper around the low-level Amazon Bedrock APIs and [Langchain](https://python.langchain.com/docs/integrations/llms/bedrock). Its main added value is that it locally persists AWS account and model configuration to enable quick and easy interaction.
