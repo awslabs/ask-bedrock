@@ -89,6 +89,12 @@ As this tool is still early stage, we are very interested in hearing about your 
 
 **A:** You may have selected a model that is currently not yet activated for public usage. It may have been listed it in the selection of available models, but unfortunately some models (such as Amazon Titan) aren’t yet available via API.
 
+---
+
+**Q:** The model responses are cut off mid-sentence.
+
+**A:** Configure the model to allow for longer response. Use model parameters (see above) for this. Claude for example would take the following model parameters: `{"max_tokens_to_sample": 3000}`
+
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
