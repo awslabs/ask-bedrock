@@ -1,11 +1,13 @@
 import atexit
 import json
 import os
+import sys
 from collections.abc import Callable
 
 import boto3
 import click
 import yaml
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.chains import ConversationChain
 from langchain.llms import Bedrock
 from langchain.memory import ConversationBufferMemory
@@ -68,7 +70,8 @@ def start_conversation(config: dict):
 
         response = conversation.predict(input=prompt)
 
-        click.secho(response, fg="yellow")
+        if not llm.streaming:
+            click.secho(response, fg="yellow")
 
 
 def get_config(context: str) -> dict:
@@ -113,9 +116,6 @@ def create_config(existing_config: str) -> dict:
 
     bedrock = boto3.Session(profile_name=aws_profile).client("bedrock", region)
     all_models = bedrock.list_foundation_models()["modelSummaries"]
-
-    if (custom_models := bedrock.list_custom_models()["modelSummaries"]) is not None:
-        all_models.extend(custom_models)
 
     applicable_models = [
         model
@@ -170,11 +170,34 @@ def create_config(existing_config: str) -> dict:
     return config
 
 
+class YellowStreamingCallbackHandler(StreamingStdOutCallbackHandler):
+    def on_llm_new_token(self, token: str, **kwargs) -> None:
+        """Run on new LLM token. Only available when streaming is enabled."""
+        sys.stdout.write(click.style(token, fg="yellow"))
+        sys.stdout.flush()
+
+    def on_llm_end(self, response, **kwargs) -> None:
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+
+
 def model_from_config(config: dict) -> Bedrock:
+    model_id = config["model_id"]
+    credentials_profile_name = config["aws_profile"]
+    region = config["region"]
+    bedrock = boto3.Session(profile_name=credentials_profile_name).client(
+        "bedrock", region
+    )
+    streaming = bedrock.get_foundation_model(modelIdentifier=model_id)["modelDetails"][
+        "responseStreamingSupported"
+    ]
+
     return Bedrock(
-        credentials_profile_name=config["aws_profile"],
-        model_id=config["model_id"],
-        region_name=config["region"],
+        credentials_profile_name=credentials_profile_name,
+        model_id=model_id,
+        region_name=region,
+        streaming=streaming,
+        callbacks=[YellowStreamingCallbackHandler()],
         model_kwargs=json.loads(config["model_params"]),
     )
 
