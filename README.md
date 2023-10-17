@@ -43,6 +43,10 @@ Multi-line prompts can be wrapped into `<<< >>>` blocks.
 
 To end your interaction, hit `Ctrl + D`. Note that the conversation will be lost.
 
+### Pricing
+
+Note that using Ask Amazon Bedrock incurs AWS fees. For more information, see [Amazon Bedrock pricing](https://aws.amazon.com/bedrock/pricing/). Consider using a dedicated AWS account and [AWS Budgets](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html) to control costs.
+
 ## Configuration
 
 *Ask Amazon Bedrock* stores your user configuration in `$HOME/.config/ask-bedrock/config.yaml`. This file may contain several sets of configuration (contexts). For instance, you can use contexts to switch between different models. Use the `--context` parameter to select the context you'd like to use. The default context is `default`.
