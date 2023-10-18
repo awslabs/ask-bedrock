@@ -39,6 +39,13 @@ def converse(context: str):
         config = create_config(None)
         put_config(context, config)
 
+    sts = boto3.client('sts')
+    try:
+        sts.get_caller_identity()
+    except Exception as e:
+        click.secho(f"Credentials are NOT valid: {e}. You may need to check your local AWS CLI configuration.")
+        return
+
     start_conversation(config)
 
 
