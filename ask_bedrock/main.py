@@ -1,5 +1,6 @@
 import atexit
 import json
+import logging
 import os
 import sys
 from collections.abc import Callable
@@ -12,12 +13,20 @@ from langchain.chains import ConversationChain
 from langchain.llms import Bedrock
 from langchain.memory import ConversationBufferMemory
 
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logger.addHandler(handler := logging.StreamHandler())
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.propagate = False
+
+logging.basicConfig(level=logging.INFO)
+
 config_file_path = os.path.join(
     os.path.expanduser("~"), ".config", "ask-bedrock", "config.yaml"
 )
 
 atexit.register(
-    lambda: click.echo(
+    lambda: logger.info(
         "\nThank you for using Ask Amazon Bedrock! Consider sharing your feedback here: https://pulse.aws/survey/GTRWNHT1"
     )
 )
@@ -28,9 +37,18 @@ def cli():
     pass
 
 
+def log_error(msg: str, e: Exception):
+    logger.error(click.style(msg, fg="red"))
+    logger.debug(e, exc_info=True)
+    logger.error(click.style(e, fg="red"))
+
+
 @cli.command()
-@click.option("--context", default="default")
-def converse(context: str):
+@click.option("-c", "--context", default="default")
+@click.option("--debug", is_flag=True, default=False)
+def converse(context: str, debug: bool):
+    if debug:
+        logging.getLogger().setLevel(logging.DEBUG)
     config = get_config(context)
     if not config:
         click.echo(
@@ -43,8 +61,11 @@ def converse(context: str):
 
 
 @cli.command()
-@click.option("--context", default="default")
-def configure(context: str):
+@click.option("-c", "--context", default="default")
+@click.option("--debug", is_flag=True, default=False)
+def configure(context: str, debug: bool):
+    if debug:
+        logging.RootLogger().setLevel(logging.DEBUG)
     existing_config = get_config(context)
     config = create_config(existing_config)
     if config is not None:
@@ -55,7 +76,7 @@ def start_conversation(config: dict):
     try:
         llm = model_from_config(config)
     except Exception as e:
-        click.secho(f"Error while building Bedrock model:\n{e}", fg="red")
+        log_error("Error while building Bedrock model", e)
         return
 
     conversation = ConversationChain(
@@ -68,7 +89,11 @@ def start_conversation(config: dict):
             lambda: click.prompt(click.style(">>>", fg="green")), return_newlines=True
         )
 
-        response = conversation.predict(input=prompt)
+        try:
+            response = conversation.predict(input=prompt)
+        except Exception as e:
+            log_error("Error while generating response", e)
+            continue
 
         if not llm.streaming:
             click.secho(response, fg="yellow")
@@ -97,7 +122,7 @@ def put_config(context: str, new_config: dict):
     new_config_file = current_config_file | {"contexts": new_contexts}
 
     with open(config_file_path, "w", encoding="utf-8") as f:
-        click.echo(f"Writing configuration to {config_file_path}.")
+        logger.info(f"Writing configuration to {config_file_path}.")
         f.write(yaml.dump(new_config_file))
 
 
@@ -115,7 +140,12 @@ def create_config(existing_config: str) -> dict:
     )
 
     bedrock = boto3.Session(profile_name=aws_profile).client("bedrock", region)
-    all_models = bedrock.list_foundation_models()["modelSummaries"]
+
+    try:
+        all_models = bedrock.list_foundation_models()["modelSummaries"]
+    except Exception as e:
+        log_error("Error listing foundation models", e)
+        return None
 
     applicable_models = [
         model

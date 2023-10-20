@@ -99,6 +99,12 @@ As this tool is still early stage, we are very interested in hearing about your 
 
 **A:** Configure the model to allow for longer response. Use model parameters (see above) for this. Claude for example would take the following model parameters: `{"max_tokens_to_sample": 3000}`
 
+---
+
+**Q**: I'm getting an error that is not listed here.
+
+**A**: Use the `--debug` option to find out more about the error. If you cannot solve it, create an issue.
+
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
