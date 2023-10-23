@@ -29,4 +29,4 @@ ask-bedrock = "ask_bedrock.main:cli"
 
 [tool.setuptools-git-versioning]
 enabled = true
-dev_template = "{tag}.post{ccount}"
+dev_template = "{tag}.post{timestamp}"
