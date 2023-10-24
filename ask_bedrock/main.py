@@ -37,10 +37,11 @@ def cli():
     pass
 
 
-def log_error(msg: str, e: Exception):
+def log_error(msg: str, e: Exception = None):
     logger.error(click.style(msg, fg="red"))
-    logger.debug(e, exc_info=True)
-    logger.error(click.style(e, fg="red"))
+    if e:
+        logger.debug(e, exc_info=True)
+        logger.error(click.style(e, fg="red"))
 
 
 @cli.command()
@@ -127,16 +128,20 @@ def put_config(context: str, new_config: dict):
 
 
 def create_config(existing_config: str) -> dict:
-    region = click.prompt(
-        "🌍 Bedrock region",
-        default=existing_config["region"] if existing_config else None,
-    )
-
     available_profiles = click.Choice(boto3.session.Session().available_profiles)
+    if len(available_profiles.choices) == 0:
+        log_error(
+            "No profiles found. Make sure you have configured the AWS CLI with at least one profile."
+        )
+        return None
     aws_profile = click.prompt(
         "👤 AWS profile",
         type=available_profiles,
         default=existing_config["aws_profile"] if existing_config else None,
+    )
+    region = click.prompt(
+        "🌍 Bedrock region",
+        default=existing_config["region"] if existing_config else None,
     )
 
     bedrock = boto3.Session(profile_name=aws_profile).client("bedrock", region)
