@@ -19,8 +19,8 @@ classifiers=[
 dependencies = [
     "click",
     "pyyaml",
-    "boto3>=1.28.57",
-    "langchain>=0.0.309",
+    "boto3==1.34.67",
+    "langchain==0.1.13",
     ]
 requires-python = ">=3.9"
 

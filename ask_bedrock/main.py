@@ -9,9 +9,9 @@ import boto3
 import click
 import yaml
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-from langchain.chains import ConversationChain
-from langchain.llms import Bedrock
+from langchain.chains.conversation.base import ConversationChain
 from langchain.memory import ConversationBufferMemory
+from langchain_community.chat_models.bedrock import BedrockChat
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -58,6 +58,8 @@ def converse(context: str, debug: bool):
         config = create_config(None)
         put_config(context, config)
 
+    config = migrate_claude_api(context, config)
+
     start_conversation(config)
 
 
@@ -66,7 +68,7 @@ def converse(context: str, debug: bool):
 @click.option("--debug", is_flag=True, default=False)
 def configure(context: str, debug: bool):
     if debug:
-        logging.RootLogger().setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.DEBUG)
     existing_config = get_config(context)
     config = create_config(existing_config)
     if config is not None:
@@ -156,7 +158,8 @@ def create_config(existing_config: str) -> dict:
         model
         for model in all_models
         if model["outputModalities"] == ["TEXT"]
-        and model["inputModalities"] == ["TEXT"]
+        and "TEXT" in model["inputModalities"]  # multi-modal input models are allowed
+        and "ON_DEMAND" in model["inferenceTypesSupported"]
     ]
 
     available_models = click.Choice([model["modelId"] for model in applicable_models])
@@ -184,10 +187,9 @@ def create_config(existing_config: str) -> dict:
     prompt = "Human: You are an assistant used in a CLI tool called 'Ask Bedrock'. The user has just completed their configuration. Write them a nice hello message, including saying that it is from you.\nAssistant:"
 
     try:
-        click.secho(
-            llm.predict(prompt),
-            fg="yellow",
-        )
+        response = llm.invoke(prompt)
+        if not llm.streaming:
+            click.secho(response, fg="yellow")
     except Exception as e:
         if isinstance(e, ValueError) and "AccessDeniedException" in str(e):
             click.secho(
@@ -216,7 +218,7 @@ class YellowStreamingCallbackHandler(StreamingStdOutCallbackHandler):
         sys.stdout.flush()
 
 
-def model_from_config(config: dict) -> Bedrock:
+def model_from_config(config: dict) -> BedrockChat:
     model_id = config["model_id"]
     credentials_profile_name = config["aws_profile"]
     region = config["region"]
@@ -227,7 +229,7 @@ def model_from_config(config: dict) -> Bedrock:
         "responseStreamingSupported"
     ]
 
-    return Bedrock(
+    return BedrockChat(
         credentials_profile_name=credentials_profile_name,
         model_id=model_id,
         region_name=region,
@@ -246,6 +248,19 @@ def multiline_prompt(prompt: Callable[[], str], return_newlines: bool) -> str:
             response += newlines + prompt()
         response = response[:-3]
     return response
+
+
+def migrate_claude_api(context: str, config: dict):
+    # https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-anthropic-claude-messages.html
+    if "max_tokens_to_sample" in config["model_params"]:
+        logger.info(
+            f"Old Claude configuration ('max_tokens_to_sample') found. Migrating to the new version."
+        )
+        model_params = json.loads(config["model_params"])
+        model_params["max_tokens"] = model_params.pop("max_tokens_to_sample")
+        config["model_params"] = json.dumps(model_params)
+        put_config(context, config)
+    return config
 
 
 if __name__ == "__main__":
