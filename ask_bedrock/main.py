@@ -11,10 +11,7 @@ import yaml
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.chains.conversation.base import ConversationChain
 from langchain.memory import ConversationBufferMemory
-from langchain_community.chat_models.bedrock import BedrockChat
-
-# hide deprication warning in output
-import warnings ; warnings.warn = lambda *args,**kwargs: None
+from langchain_aws import ChatBedrock as BedrockChat
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:

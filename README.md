@@ -43,6 +43,11 @@ Multi-line prompts can be wrapped into `<<< >>>` blocks.
 
 To end your interaction, hit `Ctrl + D`. Note that the conversation will be lost.
 
+You can also use a single prompt with a simple request-response:
+```
+ask_bedrock prompt "complete this sentence: One small step for me"
+```
+
 ### Pricing
 
 Note that using Ask Amazon Bedrock incurs AWS fees. For more information, see [Amazon Bedrock pricing](https://aws.amazon.com/bedrock/pricing/). Consider using a dedicated AWS account and [AWS Budgets](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html) to control costs.
