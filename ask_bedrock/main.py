@@ -13,6 +13,10 @@ from langchain.chains.conversation.base import ConversationChain
 from langchain.memory import ConversationBufferMemory
 from langchain_community.chat_models.bedrock import BedrockChat
 
+# quickly ignore deprictaion warnings
+import warnings ; warnings.warn = lambda *args,**kwargs: None
+
+
 logger = logging.getLogger(__name__)
 if not logger.handlers:
     logger.addHandler(handler := logging.StreamHandler())
@@ -26,7 +30,7 @@ config_file_path = os.path.join(
 )
 
 atexit.register(
-    lambda: logger.info(
+    lambda: logger.debug(
         "\nThank you for using Ask Amazon Bedrock! Consider sharing your feedback here: https://pulse.aws/survey/GTRWNHT1"
     )
 )
@@ -61,6 +65,42 @@ def converse(context: str, debug: bool):
     config = migrate_claude_api(context, config)
 
     start_conversation(config)
+
+@cli.command()
+@click.argument("command")
+@click.option("-c", "--context", default="default")
+@click.option("--debug", is_flag=True, default=False)
+def prompt(command: str, context: str, debug: bool):
+    if debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+    config = get_config(context)
+    if not config:
+        click.echo(
+            f"No configuration found for context {context}. Creating new configuration."
+        )
+        config = create_config(None)
+        put_config(context, config)
+
+    config = migrate_claude_api(context, config)
+
+    try:
+        llm = model_from_config(config)
+    except Exception as e:
+        log_error("Error while building Bedrock model", e)
+        return
+
+    conversation = ConversationChain(
+        llm=llm,
+        memory=ConversationBufferMemory(ai_prefix="Assistant"),
+    )
+
+    try:
+        response = conversation.predict(input=command)
+    except Exception as e:
+        log_error("Error while generating response", e)
+
+    if not llm.streaming:
+        click.secho(response, fg="yellow")
 
 
 @cli.command()
