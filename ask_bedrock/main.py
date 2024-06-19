@@ -13,9 +13,8 @@ from langchain.chains.conversation.base import ConversationChain
 from langchain.memory import ConversationBufferMemory
 from langchain_community.chat_models.bedrock import BedrockChat
 
-# quickly ignore deprictaion warnings
+# hide deprication warning in output
 import warnings ; warnings.warn = lambda *args,**kwargs: None
-
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
