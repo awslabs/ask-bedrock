@@ -8,20 +8,18 @@ dynamic = ["version"]
 description = 'Converse with your favorite Amazon Bedrock LLM from the command line.'
 readme = "README.md"
 authors = [
-    {name='Ulrich Hinze', email = 'uhinze@amazon.de'},
-    {name='Alexander Günsche', email = 'lxg@amazon.de'},
+    { name = 'Ulrich Hinze', email = 'uhinze@amazon.de' },
+    { name = 'Alexander Günsche', email = 'lxg@amazon.de' },
 ]
-keywords = ["ask-bedrock","GenAI","Bedrock","AWS"]
-classifiers=[
-"Development Status :: 4 - Beta",
-"Topic :: Utilities",
-]
+keywords = ["ask-bedrock", "GenAI", "Bedrock", "AWS"]
+classifiers = ["Development Status :: 4 - Beta", "Topic :: Utilities"]
 dependencies = [
     "click",
     "pyyaml",
     "boto3==1.34.67",
-    "langchain==0.1.13",
-    ]
+    "langchain==0.2.5",
+    "langchain-aws==0.1.6",
+]
 requires-python = ">=3.9"
 
 [project.scripts]
