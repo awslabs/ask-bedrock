@@ -35,6 +35,12 @@ To start a conversation, simply enter the following command:
 ask-bedrock converse
 ```
 
+If you don't need a conversation, you can get a simple request-response using:
+
+```shell
+ask-bedrock prompt "What's up?"
+```
+
 Upon the first run, you will be led through a configuration flow. To learn more about configuration options, see the [Configuration](#configuration) section below.
 
 If you’re fully configured, the tool will show you a `>>>` prompt and you can start interacting with the configured model.
@@ -45,7 +51,7 @@ To end your interaction, hit `Ctrl + D`. Note that the conversation will be lost
 
 You can also use a single prompt with a simple request-response:
 ```
-ask_bedrock prompt "complete this sentence: One small step for me"
+ask-bedrock prompt "complete this sentence: One small step for me"
 ```
 
 ### Pricing
@@ -93,12 +99,6 @@ As this tool is still early stage, we are very interested in hearing about your 
 
 
 ## Troubleshooting
-
-**Q:** I’m getting the following error during invocation: “ValueError: Error raised by bedrock service: An error occurred (AccessDeniedException) when calling the InvokeModel operation: Your account is not authorized to invoke this API operation.”
-
-**A:** You may have selected a model that is currently not yet activated for public usage. It may have been listed it in the selection of available models, but unfortunately some models (such as Amazon Titan) aren’t yet available via API.
-
----
 
 **Q:** The model responses are cut off mid-sentence.
 

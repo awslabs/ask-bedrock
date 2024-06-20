@@ -50,34 +50,19 @@ def log_error(msg: str, e: Exception = None):
 def converse(context: str, debug: bool):
     if debug:
         logging.getLogger().setLevel(logging.DEBUG)
-    config = get_config(context)
-    if not config:
-        click.echo(
-            f"No configuration found for context {context}. Creating new configuration."
-        )
-        config = create_config(None)
-        put_config(context, config)
-
-    config = migrate_claude_api(context, config)
+    config = init_config(context)
 
     start_conversation(config)
 
+
 @cli.command()
-@click.argument("command")
+@click.argument("input")
 @click.option("-c", "--context", default="default")
 @click.option("--debug", is_flag=True, default=False)
-def prompt(command: str, context: str, debug: bool):
+def prompt(input: str, context: str, debug: bool):
     if debug:
         logging.getLogger().setLevel(logging.DEBUG)
-    config = get_config(context)
-    if not config:
-        click.echo(
-            f"No configuration found for context {context}. Creating new configuration."
-        )
-        config = create_config(None)
-        put_config(context, config)
-
-    config = migrate_claude_api(context, config)
+    config = init_config(context)
 
     try:
         llm = model_from_config(config)
@@ -85,13 +70,8 @@ def prompt(command: str, context: str, debug: bool):
         log_error("Error while building Bedrock model", e)
         return
 
-    conversation = ConversationChain(
-        llm=llm,
-        memory=ConversationBufferMemory(ai_prefix="Assistant"),
-    )
-
     try:
-        response = conversation.predict(input=command)
+        response = llm.invoke(input=input)
     except Exception as e:
         log_error("Error while generating response", e)
 
@@ -150,6 +130,7 @@ def get_config(context: str) -> dict:
     return config["contexts"][context]
 
 
+# Stores a config for a given context physically
 def put_config(context: str, new_config: dict):
     if os.path.exists(config_file_path):
         with open(config_file_path, "r", encoding="utf-8") as f:
@@ -165,6 +146,7 @@ def put_config(context: str, new_config: dict):
         f.write(yaml.dump(new_config_file))
 
 
+# Leads through a new configuration dialog
 def create_config(existing_config: str) -> dict:
     available_profiles = click.Choice(boto3.session.Session().available_profiles)
     if len(available_profiles.choices) == 0:
@@ -252,6 +234,22 @@ class YellowStreamingCallbackHandler(StreamingStdOutCallbackHandler):
     def on_llm_end(self, response, **kwargs) -> None:
         sys.stdout.write("\n")
         sys.stdout.flush()
+
+
+# Tries to find a config, creates one otherwise
+def init_config(context: str) -> dict:
+    config = get_config(context)
+    if not config:
+        click.echo(
+            f"No configuration found for context {context}. Creating new configuration."
+        )
+        config = create_config(None)
+        put_config(context, config)
+
+    if config:
+        config = migrate_claude_api(context, config)
+
+    return config
 
 
 def model_from_config(config: dict) -> BedrockChat:
