@@ -33,7 +33,7 @@ def cli():
     pass
 
 
-def log_error(msg: str, e: Exception = None):
+def log_error(msg: str, e: Exception | None = None):
     logger.error(click.style(msg, fg="red"))
     if e:
         logger.debug(e, exc_info=True)
@@ -48,6 +48,10 @@ def converse(context: str, debug: bool):
         logging.getLogger().setLevel(logging.DEBUG)
     config = init_config(context)
 
+    if not config:
+        log_error("Could not build config")
+        return
+
     start_conversation(config)
 
 
@@ -59,6 +63,10 @@ def prompt(input: str, context: str, debug: bool):
     if debug:
         logging.getLogger().setLevel(logging.DEBUG)
     config = init_config(context)
+
+    if not config:
+        log_error("Could not build config")
+        return
 
     try:
         bedrock_runtime = get_bedrock_runtime(config)
@@ -126,7 +134,7 @@ def start_conversation(config: dict):
             continue
 
 
-def get_config(context: str) -> dict:
+def get_config(context: str) -> dict | None:
     if not os.path.exists(config_file_path):
         return None
     with open(config_file_path, "r", encoding="utf-8") as f:
@@ -155,7 +163,7 @@ def put_config(context: str, new_config: dict):
 
 
 # Leads through a new configuration dialog
-def create_config(existing_config: str) -> dict:
+def create_config(existing_config: dict | None) -> dict | None:
     available_profiles = click.Choice(boto3.session.Session().available_profiles)
     if len(available_profiles.choices) == 0:
         log_error(
@@ -302,14 +310,15 @@ def migrate_model_params(model_id, old_params):
 
 
 # Tries to find a config, creates one otherwise
-def init_config(context: str) -> dict:
+def init_config(context: str) -> dict | None:
     config = get_config(context)
     if not config:
         click.echo(
             f"No configuration found for context {context}. Creating new configuration."
         )
         config = create_config(None)
-        put_config(context, config)
+        if config:
+            put_config(context, config)
 
     # Handle migration from older config formats
     if config and "model_params" in config and "inference_config" not in config:
