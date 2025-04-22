@@ -6,7 +6,7 @@ Converse with your favorite [Amazon Bedrock](https://aws.amazon.com/bedrock/) la
   <img width="1000" src="https://raw.githubusercontent.com/awslabs/ask-bedrock/main/README.svg">
 </p>
 
-This tool is a wrapper around the low-level Amazon Bedrock APIs and [Langchain](https://python.langchain.com/docs/integrations/llms/bedrock). Its main added value is that it locally persists AWS account and model configuration to enable quick and easy interaction.
+This tool is a wrapper around the low-level Amazon Bedrock APIs. Its main added value is that it locally persists AWS account and model configuration to enable quick and easy interaction.
 
 ## Installation
 
@@ -76,33 +76,55 @@ contexts:
     region: ""                  # an AWS region where you have activated Bedrock
     aws_profile: ""             # a profile from your ~/.aws/config file
     model_id: ""                # a Bedrock model, e.g. "ai21.j2-ultra-v1"
-    model_params: "{}"          # a JSON object with parameters for the selected model
+    inference_config: "{}"      # a JSON object with inference configuration
 ```
 
-### Model parameters
+### Inference Configuration
 
-This JSON is passed to Langchain during client setup (as `model_kwargs`). The schema depends on the model that is used. Have a look at the [examples](model_params_examples.md).
+The `inference_config` is passed directly to the Amazon Bedrock Runtime `converse_stream` API. This configuration controls the behavior of model generation, including parameters like temperature and token limits.
 
-If you want to configure multiple lines, model parameters can be wrapped in `<<< >>>`.
+Common parameters include:
+
+- `temperature` (float): Controls randomness in response generation. Lower values make responses more deterministic.
+- `topP` (float): Controls diversity of responses by considering tokens with top cumulative probability.
+- `maxTokens` (integer): Maximum number of tokens to generate in the response.
+- `stopSequences` (array): Sequences where the model should stop generating.
+
+Example configurations:
+
+```json
+{
+  "temperature": 0.7,
+  "topP": 0.9,
+  "maxTokens": 3000
+}
+```
+
+```json
+{
+  "temperature": 0.5,
+  "maxTokens": 500,
+  "stopSequences": ["\n\n"]
+}
+```
+
+For more details, see the [Amazon Bedrock Runtime InferenceConfiguration API Reference](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_InferenceConfiguration.html).
 
 ## Building and Running Locally
 
 ```
 pip install build
 python -m build
-python ask_bedrock/main.py converse
+pip install -e .
+ask_bedrock converse
 ```
-
-## Feedback
-
-As this tool is still early stage, we are very interested in hearing about your experience. Please take one minute to take a little survey: **https://pulse.aws/survey/GTRWNHT1**
 
 
 ## Troubleshooting
 
 **Q:** The model responses are cut off mid-sentence.
 
-**A:** Configure the model to allow for longer response. Use model parameters (see above) for this. Claude for example would take the following model parameters: `{"max_tokens_to_sample": 3000}`
+**A:** Configure the model to allow for longer response by increasing the `maxTokens` value in the inference configuration (see above). For example: `{"maxTokens": 3000}`
 
 ---
 
@@ -117,4 +139,3 @@ See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more inform
 ## License
 
 This project is licensed under the Apache-2.0 License.
-
