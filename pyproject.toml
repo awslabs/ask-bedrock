@@ -13,7 +13,7 @@ authors = [
 ]
 keywords = ["ask-bedrock", "GenAI", "Bedrock", "AWS"]
 classifiers = ["Development Status :: 4 - Beta", "Topic :: Utilities"]
-dependencies = ["click", "pyyaml", "boto3==1.37.38"]
+dependencies = ["click", "pyyaml", "boto3==1.37.38", "mcp"]
 requires-python = ">=3.9"
 
 [project.scripts]

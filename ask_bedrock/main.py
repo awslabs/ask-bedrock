@@ -1,13 +1,22 @@
+from token import NAME
+from test.test_traceback import cause_message
 import atexit
+import asyncio
 import json
 import logging
 import os
+import shlex
+import subprocess
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from typing import Any, Dict, List, Optional, Tuple
+import traceback
 
 import boto3
 import click
 import yaml
+from mcp import ClientSession, StdioServerParameters, types
+from mcp.client.stdio import stdio_client
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -76,14 +85,41 @@ def prompt(input: str, context: str, debug: bool):
             if "inference_config" in config
             else {}
         )
+
+        # Initialize MCP tools and resources
+        tools = []
+        resources = []
+        if "mcp_servers" in config:
+            tools, resources = get_mcp_tools_and_resources(config)
+            if tools:
+                logger.debug(f"Using {len(tools)} MCP tools")
+            if resources:
+                logger.debug(f"Using {len(resources)} MCP resources")
     except Exception as e:
-        log_error("Error while initializing Bedrock client", e)
+        log_error("Error while initializing clients", e)
         return
 
     try:
         # Format according to the Converse API specification
         messages = [{"role": "user", "content": [{"text": input}]}]
-        stream_response(bedrock_runtime, model_id, messages, inference_config)
+        tool_uses = None
+        while tool_uses is None or len(tool_uses) > 0:
+            # iterate until no more tools to use
+            full_response, tool_uses = stream_response(
+                bedrock_runtime,
+                model_id,
+                messages,
+                inference_config,
+                tools,
+                resources
+            )
+
+            messages.append({"role": "assistant", "content": [{"text": full_response}]})
+            if len(tool_uses) > 0:
+                messages.append({"role": "assistant", "content": [{"toolUse": tool_use} for tool_use in tool_uses]})
+                tool_results = use_tools(tool_uses, config)
+                messages.append({"role": "user", "content": [{"toolResult": tool_result} for tool_result in tool_results]})
+
     except Exception as e:
         log_error("Error while generating response", e)
 
@@ -109,8 +145,18 @@ def start_conversation(config: dict):
             if "inference_config" in config
             else {}
         )
+
+        # Initialize MCP tools and resources
+        tools = []
+        resources = []
+        if "mcp_servers" in config:
+            tools, resources = get_mcp_tools_and_resources(config)
+            if tools:
+                logger.debug(f"Using {len(tools)} MCP tools")
+            if resources:
+                logger.debug(f"Using {len(resources)} MCP resources")
     except Exception as e:
-        log_error("Error while initializing Bedrock client", e)
+        log_error("Error while initializing clients", e)
         return
 
     # Initialize conversation memory
@@ -125,14 +171,77 @@ def start_conversation(config: dict):
         conversation_memory.append({"role": "user", "content": [{"text": prompt}]})
 
         try:
-            stream_response(
-                bedrock_runtime, model_id, conversation_memory, inference_config
-            )
-            # Response is captured and added inside stream_response function
+            tool_uses = None
+            while tool_uses is None or len(tool_uses) > 0:
+                # iterate until no more tools to use
+                full_response, tool_uses = stream_response(
+                    bedrock_runtime,
+                    model_id,
+                    conversation_memory,
+                    inference_config,
+                    tools,
+                    resources
+                )
+
+                conversation_memory.append({"role": "assistant", "content": [{"text": full_response}]})
+                if len(tool_uses) > 0:
+                    conversation_memory.append({"role": "assistant", "content": [{"toolUse": tool_use} for tool_use in tool_uses]})
+                    tool_results = use_tools(tool_uses, config)
+                    conversation_memory.append({"role": "user", "content": [{"toolResult": tool_result} for tool_result in tool_results]})
+
         except Exception as e:
             log_error("Error while generating response", e)
             continue
 
+def use_tools(tool_uses: list, config: dict) -> list[dict]:
+    tool_results = []
+    # Handle tool calls if any occurred
+    for tool in tool_uses:
+        logger.info(f"Calling tool: {tool['name']}")
+        logger.debug(f"Tool call: {tool}")
+        try:
+            server_name, tool_name = tool['name'].split('___', 1)
+
+            # Find the server config
+            server_config = None
+            for server in config["mcp_servers"]:
+                if server["name"] == server_name:
+                    server_config = server
+                    break
+
+            if not server_config:
+                logger.error(f"Server {server_name} not found in configuration")
+                continue
+
+            # Execute the tool call using MCP
+            server_params = StdioServerParameters(
+                command=server_config["command"],
+                args=server_config["args"] if "args" in server_config else [],
+                env=server_config["env"] if "env" in server_config else None,
+            )
+
+            result = asyncio.run(_call_tool(server_params, tool_name, tool['input']))
+            logger.debug(f"Tool result: {result}")
+
+            # Store the tool result for sending back to the model
+            tool_results.append({
+                "toolUseId": tool["toolUseId"],
+                "content": [{
+                    "text": "\n".join([text_content.text for text_content in result.content])
+                }],
+                "status": "error" if result.isError else "success"
+            })
+
+        except Exception as e:
+            # Add error result for the failed tool call
+            tool_results.append({
+                "toolUseId": tool["toolUseId"],
+                "content": [{
+                    "text": str(e)
+                }],
+                "status": "error"
+            })
+    return tool_results
 
 def get_config(context: str) -> dict | None:
     if not os.path.exists(config_file_path):
@@ -223,12 +332,27 @@ def create_config(existing_config: dict | None) -> dict | None:
         return_newlines=False,
     )
 
+    # Configure MCP servers
+    mcp_servers = []
+    if existing_config and "mcp_servers" in existing_config:
+        mcp_servers = existing_config["mcp_servers"]
+
+    configure_mcp = click.confirm(
+        "📲 Do you want to configure MCP servers?", default=bool(mcp_servers)
+    )
+
+    if configure_mcp:
+        mcp_servers = configure_mcp_servers(mcp_servers)
+
     config = {
         "region": region,
         "aws_profile": aws_profile,
         "model_id": model_id,
         "inference_config": inference_config,
     }
+
+    if mcp_servers:
+        config["mcp_servers"] = mcp_servers
 
     # Test the model
     bedrock_runtime = get_bedrock_runtime(config)
@@ -237,17 +361,28 @@ def create_config(existing_config: dict | None) -> dict | None:
             "role": "user",
             "content": [
                 {
-                    "text": "You are an assistant used in a CLI tool called 'Ask Bedrock'. "
-                    "The user has just completed their configuration. Write them a nice hello message, "
-                    "including saying that it is from you."
+                    "text": "I have just completed my configuration. Write me a nice short hello message, "
+                    "including saying that it is from you. If there are any tools, summarize their capabilities in two sentences."
+                    "Skip confirmation that you understood the request, just do it."
                 }
             ],
         }
     ]
 
     try:
-        stream_response(
-            bedrock_runtime, model_id, test_message, json.loads(inference_config)
+        # Initialize tools and resources for testing
+        tools = []
+        resources = []
+        if "mcp_servers" in config:
+            tools, resources = get_mcp_tools_and_resources(config)
+
+        _, _ = stream_response(
+            bedrock_runtime,
+            model_id,
+            test_message,
+            json.loads(inference_config),
+            tools,
+            resources
         )
     except Exception as e:
         if "AccessDeniedException" in str(e):
@@ -266,6 +401,161 @@ def create_config(existing_config: dict | None) -> dict | None:
             return None
 
     return config
+
+
+def configure_mcp_servers(existing_servers: List[dict] | None = None) -> List[dict]:
+    """Configure MCP servers with user input."""
+    if existing_servers is None:
+        existing_servers = []
+
+    servers = list(existing_servers)  # Make a copy to avoid modifying the original
+
+    if servers:
+        click.echo("Configured MCP servers:")
+        for i, server in enumerate(servers):
+            click.echo(f"  {i+1}. {server['name']} - {server['command']}")
+
+    while click.confirm("➕ Add a new MCP server?", default=True):
+        name = click.prompt("Server name", type=str)
+        command = click.prompt("Command to start the server", type=str)
+
+        # Parse command to separate executable from arguments
+        cmd_parts = shlex.split(command)
+        executable = cmd_parts[0]
+        args = cmd_parts[1:] if len(cmd_parts) > 1 else []
+
+        # Optional environment variables
+        env_vars = {}
+        while click.confirm("Add an environment variable?", default=False):
+            env_name = click.prompt("Environment variable name", type=str)
+            env_value = click.prompt("Environment variable value", type=str)
+            env_vars[env_name] = env_value
+
+        # Test the MCP server connection
+        click.echo(f"Discovering tools and resources from {name}...")
+        server_config = {
+            "name": name,
+            "command": executable,
+            "args": args,
+            "env": env_vars,
+        }
+
+        try:
+            # Try to connect and discover tools/resources
+            tools, resources = discover(server_config)
+            click.echo(f"✓ Successfully connected to server '{name}'")
+            click.echo(
+                f"  - Discovered {len(tools)} tools and {len(resources)} resources"
+            )
+
+            # Store the discovered tools and resources in the server config
+            server_config["tools"] = tools
+            server_config["resources"] = resources
+
+            servers.append(server_config)
+        except Exception as e:
+            log_error(f"Failed to connect to MCP server: {name}", e)
+            if click.confirm("Do you want to add this server anyway?", default=False):
+                server_config["tools"] = []
+                server_config["resources"] = []
+                servers.append(server_config)
+
+    # Ask if user wants to remove any servers
+    if len(servers) > 0 and click.confirm(
+        "Do you want to remove any MCP servers?", default=False
+    ):
+        while True:
+            for i, server in enumerate(servers):
+                click.echo(f"  {i+1}. {server['name']} - {server['command']}")
+
+            server_index = click.prompt(
+                "Enter the number of the server to remove (or 0 to finish)",
+                type=click.IntRange(0, len(servers)),
+                default=0,
+            )
+
+            if server_index == 0:
+                break
+
+            removed = servers.pop(server_index - 1)
+            click.echo(f"Removed server: {removed['name']}")
+
+            if not servers:
+                click.echo("No more servers to remove.")
+                break
+
+    return servers
+
+
+async def _call_tool(server_params: StdioServerParameters, tool_name: str, arguments: Dict[str, Any]) -> Any:
+    """Call a tool on an MCP server and return the result."""
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as session:
+            try:
+                await session.initialize()
+                result = await session.call_tool(tool_name, arguments=arguments)
+                return result
+            except Exception as e:
+                logger.error(f"Error calling tool {tool_name}: {str(e)}")
+                raise e
+
+async def _discover(server_config: dict) -> tuple:
+    """Connect to an MCP server and discover its tools and resources."""
+    server_params = StdioServerParameters(
+        command=server_config["command"],
+        args=server_config["args"] if "args" in server_config else [],
+        env=server_config["env"] if "env" in server_config else None,
+    )
+
+    tools = []
+    resources = []
+
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as session:
+            try:
+                await session.initialize()
+            except Exception as e:
+                log_error(f"Failed to connect to MCP server: {server_config["name"]}", traceback.format_exc())
+                raise e
+            try:
+                    # List available resources
+                resources_response = (await session.list_resources()).resources
+                resources = [resource.dict() for resource in resources_response]
+            except:
+                logger.warn(f"Could not list resources for server: {server_config["name"]}. Assuming there is none.")
+            try:
+                tools_list = (await session.list_tools()).tools
+                tools = [tool.dict() for tool in tools_list]
+            except:
+                logger.warn(f"Could not list tools for server: {server_config["name"]}. Assuming there is none.")
+
+
+    return tools, resources
+
+
+def discover(server_config: dict):
+    """Test connection to an MCP server and return discovered tools and resources."""
+    return asyncio.run(_discover(server_config))
+
+
+def get_mcp_tools_and_resources(config):
+    """Get all MCP tools and resources from configured servers."""
+    if "mcp_servers" not in config or not config["mcp_servers"]:
+        return [], []
+
+    tools = []
+    resources = []
+
+    # Collect tools and resources from all configured servers
+    for server in config["mcp_servers"]:
+        for tool in server["tools"]:
+            tool["server_name"] = server["name"]
+            tools.append(tool)
+        for resource in server["resources"]:
+            resource["server_name"] = server["name"]
+            resources.append(resource)
+
+    return tools, resources
 
 
 def migrate_model_params(model_id, old_params):
@@ -352,18 +642,56 @@ def get_bedrock(config: dict):
     )
 
 
-def stream_response(bedrock_runtime, model_id, messages, inference_config):
+def stream_response(
+    bedrock_runtime, model_id, messages, inference_config, tools, resources
+) -> tuple[str,list]:
+
+        #TODO decide what to do with resources
+    # Prepare request with tools and resources if available
+    request_params = {
+        "modelId": model_id,
+        "messages": messages,
+        "system": [{
+        "text": "You're an AI assistant for a CLI tool called Ask Bedrock. Depending on the function invoked, the user either chats with you or sends a single prompt. You may or may not have a set of tools at your disposal."
+        }],
+        "inferenceConfig": inference_config if inference_config else None,
+    }
+    if tools and len(tools) > 0:
+        # map to Converse request schema
+        request_params["toolConfig"]= {
+            "tools": [{"toolSpec": {
+                "description": tool["description"],
+                # Prefix tool name with server name to make it uniquely identifiable
+                "name": f"{tool['server_name']}___{tool['name']}",
+                "inputSchema": {
+                    "json": tool["inputSchema"]
+                }
+            }} for tool in tools]
+        }
+
     try:
-        response = bedrock_runtime.converse_stream(
-            modelId=model_id,
-            messages=messages,
-            inferenceConfig=inference_config if inference_config else None,
-        )
+        # Execute the request
+        logger.debug(f"Sending request to model {model_id}")
+        response = bedrock_runtime.converse_stream(**request_params)
 
         full_response = ""
+        tool_uses = []
+        current_tool_use = None
+
         # The response is a stream of events
         for event in response["stream"]:
-            # Process content delta events which contain the actual text
+            if "contentBlockStart" in event:
+                current_tool_use = {
+                        "toolUseId": event["contentBlockStart"]["start"]["toolUse"]["toolUseId"],
+                        "name": event["contentBlockStart"]["start"]["toolUse"]["name"],
+                        "input": ""
+                    }
+            if "contentBlockStop" in event and current_tool_use:
+                if current_tool_use:
+                    current_tool_use["input"] = json.loads(current_tool_use["input"])
+                    tool_uses.append(current_tool_use)
+                    current_tool_use = None
+
             if "contentBlockDelta" in event:
                 delta = event["contentBlockDelta"]["delta"]
                 if "text" in delta:
@@ -371,17 +699,17 @@ def stream_response(bedrock_runtime, model_id, messages, inference_config):
                     full_response += chunk_text
                     sys.stdout.write(click.style(chunk_text, fg="yellow"))
                     sys.stdout.flush()
-
-        # Add the assistant's response to conversation memory
-        if messages and isinstance(messages, list):
-            messages.append({"role": "assistant", "content": [{"text": full_response}]})
+                if "toolUse" in delta:
+                    if not current_tool_use:
+                        raise Exception("Tool use block never started")
+                    current_tool_use["input"] += delta["toolUse"]["input"]
 
         sys.stdout.write("\n")
         sys.stdout.flush()
 
-        return full_response
+        return full_response, tool_uses
     except Exception as e:
-        log_error(f"Error in stream_response: {str(e)}", e)
+        log_error(f"Error in stream_response: {str(e)}", traceback.format_exc())
         raise
 
 
