@@ -30,12 +30,6 @@ config_file_path = os.path.join(
     os.path.expanduser("~"), ".config", "ask-bedrock", "config.yaml"
 )
 
-atexit.register(
-    lambda: logger.debug(
-        "\nThank you for using Ask Amazon Bedrock! Consider sharing your feedback here: https://pulse.aws/survey/GTRWNHT1"
-    )
-)
-
 
 @click.group()
 def cli():
@@ -293,12 +287,13 @@ def create_config(existing_config: dict | None) -> dict | None:
 
     try:
         all_models = bedrock.list_foundation_models()["modelSummaries"]
+        inference_profiles = bedrock.list_inference_profiles()["inferenceProfileSummaries"]
     except Exception as e:
         log_error("Error listing foundation models", e)
         return None
 
-    applicable_models = [
-        model
+    applicable_model_ids = [
+        model["modelId"]
         for model in all_models
         if model["outputModalities"] == ["TEXT"]
         and "TEXT" in model["inputModalities"]  # multi-modal input models are allowed
@@ -306,7 +301,10 @@ def create_config(existing_config: dict | None) -> dict | None:
         and model["responseStreamingSupported"]  # Only include streaming-capable models
     ]
 
-    available_models = click.Choice([model["modelId"] for model in applicable_models])
+    applicable_model_ids.extend([profile["inferenceProfileId"] for profile in inference_profiles])
+
+
+    available_models = click.Choice(applicable_model_ids)
     model_id = click.prompt(
         "🚗 Model",
         type=available_models,
@@ -688,7 +686,11 @@ def stream_response(
                     }
             if "contentBlockStop" in event and current_tool_use:
                 if current_tool_use:
-                    current_tool_use["input"] = json.loads(current_tool_use["input"])
+                    if current_tool_use["input"] == "":
+                        current_tool_use["input"] = {}
+                    else:
+                        current_tool_use["input"] = json.loads(current_tool_use["input"])
+                    logger.debug(f"current_tool_use {current_tool_use}")
                     tool_uses.append(current_tool_use)
                     current_tool_use = None
 
