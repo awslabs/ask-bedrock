@@ -324,7 +324,7 @@ def create_config(existing_config: dict | None) -> dict | None:
 
     inference_config = multiline_prompt(
         lambda: click.prompt(
-            "🔠 Inference configuration (JSON)",
+            "🔧 Inference configuration (JSON)",
             default=default_inference_config,
         ),
         return_newlines=False,
@@ -336,7 +336,7 @@ def create_config(existing_config: dict | None) -> dict | None:
         mcp_servers = existing_config["mcp_servers"]
 
     configure_mcp = click.confirm(
-        "📲 Do you want to configure MCP servers?", default=bool(mcp_servers)
+        "🔌 Do you want to configure MCP servers?", default=bool(mcp_servers)
     )
 
     if configure_mcp:
@@ -361,6 +361,7 @@ def create_config(existing_config: dict | None) -> dict | None:
                 {
                     "text": "I have just completed my configuration. Write me a nice short hello message, "
                     "including saying that it is from you. If there are any tools, summarize their capabilities in two sentences."
+                    "If you don't have any tools, skip this part."
                     "Skip confirmation that you understood the request, just do it."
                 }
             ],
@@ -413,7 +414,7 @@ def configure_mcp_servers(existing_servers: List[dict] | None = None) -> List[di
         for i, server in enumerate(servers):
             click.echo(f"  {i+1}. {server['name']} - {server['command']}")
 
-    while click.confirm("➕ Add a new MCP server?", default=True):
+    while click.confirm("+ Add a new MCP server?", default=True):
         name = click.prompt("Server name", type=str)
         command = click.prompt("Command to start the server", type=str)
 
@@ -460,7 +461,7 @@ def configure_mcp_servers(existing_servers: List[dict] | None = None) -> List[di
 
     # Ask if user wants to remove any servers
     if len(servers) > 0 and click.confirm(
-        "Do you want to remove any MCP servers?", default=False
+        "- Remove an MCP server?", default=False
     ):
         while True:
             for i, server in enumerate(servers):
@@ -520,12 +521,12 @@ async def _discover(server_config: dict) -> tuple:
                 resources_response = (await session.list_resources()).resources
                 resources = [resource.dict() for resource in resources_response]
             except:
-                logger.warn(f"Could not list resources for server: {server_config["name"]}. Assuming there is none.")
+                logger.warning(f"Could not list resources for server: {server_config["name"]}. Assuming there is none.")
             try:
                 tools_list = (await session.list_tools()).tools
-                tools = [tool.dict() for tool in tools_list]
+                tools = [tool.model_dump() for tool in tools_list]
             except:
-                logger.warn(f"Could not list tools for server: {server_config["name"]}. Assuming there is none.")
+                logger.warning(f"Could not list tools for server: {server_config["name"]}. Assuming there is none.")
 
 
     return tools, resources

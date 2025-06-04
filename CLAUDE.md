@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 - Build: `python -m build`
 - Install locally: `pip install -e .`
-- Test: `ask-bedrock prompt 'How are you doing?'`
+- Run CLI: `ask-bedrock prompt 'How are you doing?'`
+- Test: `python -m pytest` or `python tests/run_tests.py`
 - Format: `black ask_bedrock/`
 - Type check: `mypy ask_bedrock/`
 
@@ -22,3 +23,5 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Python 3.9+ required
 - Configuration in `$HOME/.config/ask-bedrock/config.yaml`
 - Main CLI implementation in `ask_bedrock/main.py`
+- Unit tests in `tests/unit/`
+- Run tests with `python tests/run_tests.py` or `python -m pytest`

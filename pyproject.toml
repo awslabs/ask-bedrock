@@ -16,9 +16,23 @@ classifiers = ["Development Status :: 4 - Beta", "Topic :: Utilities"]
 dependencies = ["click", "pyyaml", "boto3==1.37.38", "mcp"]
 requires-python = ">=3.9"
 
+[project.optional-dependencies]
+test = ["pytest>=7.0.0", "pytest-cov>=4.0.0", "mock>=5.0.0"]
+
 [project.scripts]
 ask-bedrock = "ask_bedrock.main:cli"
 
 [tool.setuptools-git-versioning]
 enabled = true
 dev_template = "{tag}.post{timestamp}"
+
+[tool.pytest]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "--cov=ask_bedrock --cov-report=term-missing"
+testpaths = ["tests"]
