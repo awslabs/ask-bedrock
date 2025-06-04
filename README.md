@@ -54,6 +54,9 @@ You can also use a single prompt with a simple request-response:
 ask-bedrock prompt "complete this sentence: One small step for me"
 ```
 
+### MCP
+Ask Amazon Bedrock supports the [Model Context Protocol](https://modelcontextprotocol.io). You can register MCP servers through [configuration](#configuration), which auto-discovers resources and tools from an MCP server. The resources and tools are then available during invocation.
+
 ### Pricing
 
 Note that using Ask Amazon Bedrock incurs AWS fees. For more information, see [Amazon Bedrock pricing](https://aws.amazon.com/bedrock/pricing/). Consider using a dedicated AWS account and [AWS Budgets](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html) to control costs.
@@ -68,7 +71,7 @@ If no configuration is found for a selected context, a new one is created. If yo
 ask-bedrock configure --context mycontext
 ```
 
-You can also create or edit the configuration file yourself in `$HOME/.config/ask-bedrock/config.yaml`:
+You can also create or edit the configuration file yourself in `$HOME/.config/ask-bedrock/config.yaml`. Note that MCP configuration is verbose, but mostly auto-discovered during `ask-bedrock configure`:
 
 ```yaml
 contexts:
@@ -77,6 +80,29 @@ contexts:
     aws_profile: ""             # a profile from your ~/.aws/config file
     model_id: ""                # a Bedrock model, e.g. "ai21.j2-ultra-v1"
     inference_config: "{}"      # a JSON object with inference configuration
+    mcp_servers:
+    - command: npx
+      args:
+      - -y
+      - '@modelcontextprotocol/server-filesystem'
+      - /Users/uhinze/Downloads
+      env: {}
+      name: file
+      resources: []
+      tools:
+      - description: Read the complete contents of a file from the file system. Handles various text encodings and provides detailed error messages if the file cannot be read. Use this tool when you need to examine the contents of a single file. Only works within allowed directories.
+        inputSchema:
+          $schema: http://json-schema.org/draft-07/schema#
+        additionalProperties: false
+        properties:
+          path:
+            type: string
+        required:
+        - path
+        type: object
+        name: read_file
+        server_name: file
+      - ...more tools
 ```
 
 ### Inference Configuration
