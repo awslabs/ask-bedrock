@@ -19,6 +19,8 @@ This tool is a wrapper around the low-level Amazon Bedrock APIs. Its main added 
 pip install ask-bedrock
 ```
 
+Please refer to the troubleshooting section below if this does not work.
+
 You can also build/run this project locally, see [Building and Running Locally](#building-and-running-locally).
 
 ## Usage
@@ -102,7 +104,7 @@ contexts:
         type: object
         name: read_file
         server_name: file
-      - ...more tools
+      - <...more tools>
 ```
 
 ### Inference Configuration
@@ -147,6 +149,12 @@ ask_bedrock converse
 
 
 ## Troubleshooting
+
+**Q:** pip does not install ask-bedrock properly, instead it gives me an error like `This environment is externally managed`.
+
+**A:** ask-bedrock needs to be installed globally to be available in your command line. Please follow the guidance in the error message by first installing `pipx` and then installing ask-bedrock using pipx.
+
+---
 
 **Q:** The model responses are cut off mid-sentence.
 
