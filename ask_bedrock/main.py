@@ -1,6 +1,4 @@
 from token import NAME
-from test.test_traceback import cause_message
-import atexit
 import asyncio
 import json
 import logging
