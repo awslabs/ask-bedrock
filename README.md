@@ -1,5 +1,17 @@
 # Ask Amazon Bedrock
 
+> [!IMPORTANT]
+> **This project is archived and no longer maintained.**
+>
+> The repository is read-only: issues and pull requests are closed, and no further
+> releases, fixes, or security updates will be published. Published packages on PyPI
+> remain installable, but they will not receive updates.
+>
+> Ask Amazon Bedrock was written in 2023, when no command-line agent harnesses existed
+> and talking to a model from a terminal meant calling the API yourself. That is no
+> longer the case: use [Kiro](https://kiro.dev) instead, a full agent harness that
+> drives models with tool use, file editing, shell access, and MCP servers.
+
 Converse with your favorite [Amazon Bedrock](https://aws.amazon.com/bedrock/) large language model from the command line.
 
 <p>
